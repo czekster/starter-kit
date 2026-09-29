@@ -34,9 +34,6 @@ services:
     restart: unless-stopped
 
   # -- One-shot: grant the app user rights to create databases/tables ---------
-  # Runs on every up, waits for the DB, applies the grant, then exits.
-  # Idempotent and data-safe: it only changes privileges, never data.
-  # Shows as "Exited (0)" afterwards - that's expected.
   dbgrant:
     image: mariadb:11
     depends_on:
@@ -48,7 +45,7 @@ services:
       sh -c "until mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done &&
              mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e \"GRANT ALL PRIVILEGES ON *.* TO '${DB_USER:-student}'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;\""
 
-  # -- Optional: DB inspection tool (not one of the three tiers - a dev aid) --
+  # -- Optional: DB inspection tool -------------------------------------------
   phpmyadmin:
     image: phpmyadmin:5
     container_name: app_phpmyadmin
@@ -56,150 +53,6 @@ services:
       PMA_HOST: db
       PMA_USER: ${DB_USER:-student}
       PMA_PASSWORD: ${DB_PASSWORD:-student}
-    ports:
-      - "127.0.0.1:8081:80"
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: unless-stopped
-
-networks:
-  app-net:
-    driver: bridge
-
-volumes:
-  db_data:services:
-
-  # -- PRESENTATION-facing / APPLICATION tier ---------------------------------
-  web:
-    build: ./web
-    container_name: app_web
-    ports:
-      - "127.0.0.1:8080:80"
-    environment:
-      DB_NAME: ${DB_NAME:-app_db}
-      DB_USER: ${DB_USER:-student}
-      DB_PASSWORD: ${DB_PASSWORD:-student}
-    volumes:
-      - ./src:/var/www/html
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: unless-stopped
-
-  # -- DATA tier --------------------------------------------------------------
-  db:
-    image: mariadb:11
-    container_name: app_db
-    environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
-      MARIADB_DATABASE: ${DB_NAME:-app_db}
-      MARIADB_USER: ${DB_USER:-student}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-student}
-    volumes:
-      - db_data:/var/lib/mysql
-    networks:
-      - app-net
-    restart: unless-stopped
-
-  # -- One-shot: grant the app user rights to create databases/tables ---------
-  # Runs on every up, waits for the DB, applies the grant, then exits.
-  # Idempotent and data-safe: it only changes privileges, never data.
-  # Shows as "Exited (0)" afterwards - that's expected.
-  dbgrant:
-    image: mariadb:11
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: "no"
-    command: >
-      sh -c "until mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done &&
-             mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e \"GRANT ALL PRIVILEGES ON *.* TO '${DB_USER:-student}'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;\""
-
-  # -- Optional: DB inspection tool (not one of the three tiers - a dev aid) --
-  phpmyadmin:
-    image: phpmyadmin:5
-    container_name: app_phpmyadmin
-    environment:
-      PMA_HOST: db
-      PMA_USER: ${DB_USER:-student}
-      PMA_PASSWORD: ${DB_PASSWORD:-student}
-    ports:
-      - "127.0.0.1:8081:80"
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: unless-stopped
-
-networks:
-  app-net:
-    driver: bridge
-
-volumes:
-  db_data:services:
-
-  # -- PRESENTATION-facing / APPLICATION tier ---------------------------------
-  # Apache handles HTTP; PHP-FPM is the actual application server executing
-  # your code. They're split into two containers on purpose - see README.
-  web:
-    build: ./web
-    container_name: app_web
-    ports:
-      - "127.0.0.1:8080:80"
-    environment:
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ./src:/var/www/html
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: unless-stopped
-
-  # -- DATA tier --------------------------------------------------------------
-  db:
-    image: mariadb:11
-    container_name: app_db
-    environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${DB_NAME}
-      MARIADB_USER: ${DB_USER}
-      MARIADB_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - db_data:/var/lib/mysql
-    networks:
-      - app-net
-    restart: unless-stopped
-
-  # -- One-shot: grant the app user rights to create databases/tables ---------
-  # Runs on every `up`, waits for the DB, applies the grant, then exits.
-  # Idempotent and data-safe: it only changes privileges, never data.
-  # Shows as "Exited (0)" in Docker Desktop afterwards - that's expected.
-  dbgrant:
-    image: mariadb:11
-    depends_on:
-      - db
-    networks:
-      - app-net
-    restart: "no"
-    command: >
-      sh -c "until mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD}' -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done &&
-             mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD}' -e \"GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;\""
-
-  # -- Optional: DB inspection tool (not one of the three tiers - a dev aid) --
-  phpmyadmin:
-    image: phpmyadmin:5
-    container_name: app_phpmyadmin
-    environment:
-      PMA_HOST: db
-      PMA_USER: ${DB_USER}
-      PMA_PASSWORD: ${DB_PASSWORD}
     ports:
       - "127.0.0.1:8081:80"
     depends_on:
