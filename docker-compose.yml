@@ -41,9 +41,37 @@ services:
     networks:
       - app-net
     restart: "no"
-    command: >
-      sh -c "until mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done &&
-             mariadb -hdb -uroot -p'${DB_ROOT_PASSWORD:-root}' -e \"GRANT ALL PRIVILEGES ON *.* TO '${DB_USER:-student}'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;\""
+
+    environment:
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      DB_USER: ${DB_USER:-student}
+      DB_PASSWORD: ${DB_PASSWORD:-student}
+
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        echo "Waiting for MariaDB..."
+
+        until mariadb -h db -u root -p"$$DB_ROOT_PASSWORD" \
+          -e "SELECT 1" >/dev/null 2>&1; do
+          sleep 2
+        done
+
+        echo "Configuring database user..."
+
+        mariadb -h db -u root -p"$$DB_ROOT_PASSWORD" -e "
+          CREATE USER IF NOT EXISTS '$$DB_USER'@'%'
+            IDENTIFIED BY '$$DB_PASSWORD';
+
+          ALTER USER '$$DB_USER'@'%'
+            IDENTIFIED BY '$$DB_PASSWORD';
+
+          GRANT ALL PRIVILEGES ON *.* TO '$$DB_USER'@'%'
+            WITH GRANT OPTION;
+        "
+
+        echo "Database user configured successfully."
 
   # -- Optional: DB inspection tool -------------------------------------------
   phpmyadmin:
